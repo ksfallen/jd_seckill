@@ -278,7 +278,6 @@ class JdSeckill(object):
         self.seckill_url = dict()
         self.seckill_order_data = dict()
         self.timers = Timer()
-
         self.session = self.spider_session.get_session()
         self.user_agent = self.spider_session.user_agent
         self.nick_name = None
@@ -378,19 +377,35 @@ class JdSeckill(object):
             'Referer': 'https://item.jd.com/{}.html'.format(self.sku_id),
         }
         resp = self.session.get(url=url, params=payload, headers=headers)
+        logger.debug(f'预约信息: {resp.text}')
         resp_json = parse_json(resp.text)
         reserve_url = resp_json.get('url')
+        _url = f'https:{reserve_url}'
+        state = resp_json.get('state')
+        info = resp_json.get('info')
+        if state == 1 and "未开始" in info:
+            yueStime = resp_json.get('yueStime')
+            logger.info(f'预约开始时间: {yueStime}')
+            logger.info(f'预约地址: {_url}')
+            self.timers.reset_buy_time(f'{yueStime}.100000')
         self.timers.start()
         while True:
             try:
-                self.session.get(url='https:' + reserve_url)
+                resp = self.session.get(_url)
+                # self.session.get(url='https:' + reserve_url)
+                resp.encoding = 'UTF-8'
+                if '您所访问的页面不存在' in resp.text:
+                    print(f'页面不存在: {_url}')
+                    time.sleep(0.1)
+                    continue
                 logger.info('预约成功，已获得抢购资格 / 您已成功预约过了，无需重复预约')
                 if global_config.getRaw('messenger', 'enable') == 'true':
                     success_message = "预约成功，已获得抢购资格 / 您已成功预约过了，无需重复预约"
                     send_wechat(success_message)
                 break
-            except Exception as e:
+            except Exception:
                 logger.error('预约失败正在重试...')
+                time.sleep(0.1)
 
     def get_username(self):
         """获取用户信息"""
@@ -573,7 +588,6 @@ class JdSeckill(object):
         except Exception as e:
             logger.info('抢购失败，无法获取生成订单的基本信息，接口返回:【{}】'.format(str(e)))
             return False
-
         logger.info('提交抢购订单...')
         headers = {
             'User-Agent': self.user_agent,
@@ -583,8 +597,7 @@ class JdSeckill(object):
         resp = self.session.post(
             url=url,
             params=payload,
-            data=self.seckill_order_data.get(
-                self.sku_id),
+            data=self.seckill_order_data.get(self.sku_id),
             headers=headers)
         resp_json = None
         try:

@@ -1,23 +1,28 @@
 # -*- coding:utf-8 -*-
-import time
-import requests
 import json
-
+import time
 from datetime import datetime
-from jd_logger import logger
+
+import requests
 from config import global_config
+from jd_logger import logger
 
 
 class Timer(object):
     def __init__(self, sleep_interval=0.5):
         # '2018-09-28 22:45:50.000'
-        self.buy_time = datetime.strptime(global_config.getRaw('config','buy_time'), "%Y-%m-%d %H:%M:%S.%f")
+        self.buy_time = datetime.strptime(global_config.getRaw('config', 'buy_time'), "%Y-%m-%d %H:%M:%S.%f")
         self.buy_time_ms = int(time.mktime(self.buy_time.timetuple()) * 1000.0 + self.buy_time.microsecond / 1000)
         self.sleep_interval = sleep_interval
-
         self.diff_time = self.local_jd_time_diff()
 
-    def jd_time(self):
+    def reset_buy_time(self, buy_time):
+        logger.info(f'配置的设定时间:{self.buy_time}，更新为: {buy_time}')
+        self.buy_time = datetime.strptime(buy_time, "%Y-%m-%d %H:%M:%S.%f")
+        self.buy_time_ms = int(time.mktime(self.buy_time.timetuple()) * 1000.0 + self.buy_time.microsecond / 1000)
+
+    @classmethod
+    def jd_time(cls):
         """
         从京东服务器获取时间毫秒
         :return:
